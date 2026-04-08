@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #1e90ff;
+}
+
+body {
+  background-color: #f3f4f6;
+  margin: 0;
+  font-family: inherit;
+}
