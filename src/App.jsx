@@ -2,6 +2,35 @@ import React, { useState, useEffect, useCallback, useRef, forwardRef, useMemo } 
 import HTMLFlipBook from 'react-pageflip';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, BookOpen, Terminal } from 'lucide-react';
+import { TUFBackground3D } from './Background3D';
+
+/* ═══════════════════════════════════════════════════════════
+   HOOK: Responsive scale — fits 800×1000 into any viewport
+   ═══════════════════════════════════════════════════════════ */
+const CAL_W = 800;
+const CAL_H = 1000;
+function useCalendarScale() {
+  const [scale, setScale] = useState(1);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const calc = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const mobile = vw < 900;
+      setIsMobile(mobile);
+      // Leave padding around the calendar
+      const padX = mobile ? 16 : 120; // space for arrows on desktop
+      const padY = mobile ? 100 : 160; // space for header/footer
+      const sx = (vw - padX) / CAL_W;
+      const sy = (vh - padY) / CAL_H;
+      setScale(Math.min(sx, sy, 1)); // never scale up beyond 1
+    };
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, []);
+  return { scale, isMobile };
+}
 
 /* ═══════════════════════════════════════════════════════════
    TUF BRAND TOKENS
@@ -466,12 +495,27 @@ export default function App() {
     setSelStart(start); setSelEnd(end);
   }, []);
 
+  const { scale, isMobile } = useCalendarScale();
+
+  // 3D tilt effect
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const handleMouseMove = (e) => {
+    const x = (e.clientX / window.innerWidth - 0.5) * 20;
+    const y = (e.clientY / window.innerHeight - 0.5) * -20;
+    setMousePos({ x, y });
+  };
+
   return (
     <>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800;900&display=swap');`}</style>
 
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-8 gap-6"
-        style={{ background: `radial-gradient(ellipse at 50% 0%,#1a0a0025 0%,${TUF.bg} 65%)`, fontFamily: "'JetBrains Mono', monospace" }}>
+      <TUFBackground3D />
+
+      <div
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setMousePos({ x: 0, y: 0 })}
+        className="min-h-screen flex flex-col items-center justify-center p-2 sm:p-8 gap-3 sm:gap-6 relative z-10"
+        style={{ background: `radial-gradient(ellipse at 50% 0%,#1a0a0080 0%, transparent 80%)`, fontFamily: "'JetBrains Mono', monospace", overflow: 'hidden', perspective: '1000px' }}>
 
         <Toast message={toast.msg} visible={toast.visible} />
 
@@ -483,57 +527,74 @@ export default function App() {
           <div className="w-px h-5" style={{ background: TUF.border }} />
         </div>
 
-        {/* calendar */}
-        <div style={{
-          width: 800, height: 1000, position: 'relative',
-          borderRadius: '0 0 8px 8px',
-          boxShadow: `0 0 0 1px ${TUF.border},0 32px 80px rgba(0,0,0,.8),0 0 60px ${TUF.orange}10`,
-        }}>
-          <SpiralBinding />
+        {/* calendar — responsive scale wrapper with 3D tilt */}
+        <motion.div
+          animate={{
+            rotateX: mousePos.y,
+            rotateY: mousePos.x,
+          }}
+          transition={{ type: 'spring', stiffness: 75, damping: 20 }}
+          style={{
+            width: CAL_W * scale,
+            height: CAL_H * scale,
+            position: 'relative',
+            flexShrink: 0,
+            transformStyle: 'preserve-3d',
+          }}>
+          <div style={{
+            width: CAL_W, height: CAL_H, position: 'absolute',
+            top: 0, left: 0,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            borderRadius: '0 0 8px 8px',
+            boxShadow: `0 0 0 1px ${TUF.border},0 32px 80px rgba(0,0,0,.8),0 0 60px ${TUF.orange}10`,
+          }}>
+            <SpiralBinding />
 
-          <HTMLFlipBook
-            ref={bookRef}
-            width={800} height={1000}
-            size="fixed" usePortrait={true}
-            drawShadow={true} maxShadowOpacity={0.5}
-            flippingTime={1100}
-            useMouseEvents={false} clickEventForward={false} disableFlipByClick={true}
-            showCover={false} startPage={8} mobileScrollSupport={false}
-            showPageCorners={false} startZIndex={10}
-            onFlip={handleFlip}
-          >
-            {Array.from({ length: 12 }, (_, i) => (
-              <CalendarPage
-                key={i}
-                monthIndex={i}
-                year={YEAR}
-                initialNote={notes[MONTHS[i]] || ''}
-                onSaveNotes={onSaveNotes}
-                selStart={curPage === i ? selStart : null}
-                selEnd={curPage === i ? selEnd : null}
-                onRangeCommit={onRangeCommit}
-                isActivePage={curPage === i}
-              />
-            ))}
-          </HTMLFlipBook>
-
-          {/* Arrow buttons — no hover zone, no floating pill */}
-          {[
-            { side: 'left', Icon: ChevronLeft, fn: flipPrev, pos: { left: -56 } },
-            { side: 'right', Icon: ChevronRight, fn: flipNext, pos: { right: -56 } },
-          ].map(({ side, Icon, fn, pos }) => (
-            <button
-              key={side}
-              onClick={fn}
-              className="absolute top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center z-50 cursor-pointer"
-              style={{ ...pos, background: TUF.surface, border: `1px solid ${TUF.border}`, color: TUF.text, boxShadow: '0 4px 20px rgba(0,0,0,.5)', transition: 'all 0.2s' }}
-              onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: TUF.orange, color: TUF.orange, boxShadow: `0 0 16px ${TUF.orange}40`, transform: 'translateY(-50%) scale(1.12)' })}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: TUF.border, color: TUF.text, boxShadow: '0 4px 20px rgba(0,0,0,.5)', transform: 'translateY(-50%) scale(1)' })}
+            <HTMLFlipBook
+              ref={bookRef}
+              width={CAL_W} height={CAL_H}
+              size="fixed" usePortrait={true}
+              drawShadow={true} maxShadowOpacity={0.5}
+              flippingTime={1100}
+              useMouseEvents={false} clickEventForward={false} disableFlipByClick={true}
+              showCover={false} startPage={8} mobileScrollSupport={false}
+              showPageCorners={false} startZIndex={10}
+              onFlip={handleFlip}
             >
-              <Icon size={20} strokeWidth={2.5} />
-            </button>
-          ))}
-        </div>
+              {Array.from({ length: 12 }, (_, i) => (
+                <CalendarPage
+                  key={i}
+                  monthIndex={i}
+                  year={YEAR}
+                  initialNote={notes[MONTHS[i]] || ''}
+                  onSaveNotes={onSaveNotes}
+                  selStart={curPage === i ? selStart : null}
+                  selEnd={curPage === i ? selEnd : null}
+                  onRangeCommit={onRangeCommit}
+                  isActivePage={curPage === i}
+                />
+              ))}
+            </HTMLFlipBook>
+
+            {/* Arrow buttons — inside on mobile, outside on desktop */}
+            {[
+              { side: 'left', Icon: ChevronLeft, fn: flipPrev, pos: isMobile ? { left: 8 } : { left: -56 } },
+              { side: 'right', Icon: ChevronRight, fn: flipNext, pos: isMobile ? { right: 8 } : { right: -56 } },
+            ].map(({ side, Icon, fn, pos }) => (
+              <button
+                key={side}
+                onClick={fn}
+                className="absolute top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center z-50 cursor-pointer"
+                style={{ ...pos, background: isMobile ? `${TUF.surface}ee` : TUF.surface, backdropFilter: isMobile ? 'blur(8px)' : 'none', border: `1px solid ${TUF.border}`, color: TUF.text, boxShadow: '0 4px 20px rgba(0,0,0,.5)', transition: 'all 0.2s' }}
+                onMouseEnter={e => Object.assign(e.currentTarget.style, { borderColor: TUF.orange, color: TUF.orange, boxShadow: `0 0 16px ${TUF.orange}40`, transform: 'translateY(-50%) scale(1.12)' })}
+                onMouseLeave={e => Object.assign(e.currentTarget.style, { borderColor: TUF.border, color: TUF.text, boxShadow: '0 4px 20px rgba(0,0,0,.5)', transform: 'translateY(-50%) scale(1)' })}
+              >
+                <Icon size={20} strokeWidth={2.5} />
+              </button>
+            ))}
+          </div>
+        </motion.div>
 
         {/* help strip */}
         <div className="flex items-center gap-4 flex-wrap justify-center select-none">
@@ -555,4 +616,5 @@ export default function App() {
       </div>
     </>
   );
+
 }

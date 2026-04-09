@@ -4,13 +4,28 @@
   --color-primary: #1e90ff;
 }
 
-body {
-  background-color: #f3f4f6;
+html, body {
   margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: #0d0d0d;
   font-family: inherit;
+  min-height: 100dvh;
 }
 
 /* Ensure react-pageflip canvas doesn't block interactive page content */
 .stf__parent canvas {
   pointer-events: none !important;
+}
+
+/* Prevent text selection while flipping on touch devices */
+.stf__parent {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
