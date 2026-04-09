@@ -19,8 +19,8 @@
 
 | Resource | URL |
 |----------|-----|
-| 🌐 **Live Demo** | [Live Demo URL — Placeholder] |
-| 🎥 **Video Walkthrough** | [Video Walkthrough URL — Placeholder] |
+| 🌐 **Live Demo** | https://tuf-assesment-two.vercel.app/ |
+| 🎥 **Video Walkthrough** | https://drive.google.com/file/d/1VynzncKhgAdGbLDd8VvUnPcl-X3xcCou/view?usp=sharing
 | 📦 **Repository** | [github.com/shailesh2909/tuf-assesment](https://github.com/shailesh2909/tuf-assesment) |
 
 ---
